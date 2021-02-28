@@ -23,7 +23,7 @@ enum Cli {
         dataset: PathBuf,
 
         /// n-gram size (how many words to group as one element)
-        #[structopt(short = "n", long = "ngram-size", default_value = "3")]
+        #[structopt(short = "n", long = "ngram-size", default_value = "1")]
         ngram: u8,
 
         /// scaled (what ratio of n-grams to keep for analysis)

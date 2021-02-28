@@ -1,5 +1,7 @@
+from pathlib import Path
+
 rule all:
-    input: expand("data/chp{num}.txt", num=range(1, 14))
+  input: expand("data/plots/n{nsize}-s{scaled}.matrix.png", nsize=[1], scaled=[1])
 
 rule download:
   output: "data/book.epub"
@@ -15,8 +17,48 @@ rule extract_chapters:
   """
 
 rule convert_chapter:
-  output: "data/chp{num}.txt"
+  output: "data/txt/chp{num}.txt"
   input: "data/OEBPS/Chapter{num}.xhtml"
   shell: """
     pandoc -t plain {input} -o {output}
+  """
+
+rule sketch:
+  output: "data/sketches/chp{num}-n{nsize}-s{scaled}.sig"
+  input:
+    sig="data/txt/chp{num}.txt",
+    bin="ansible/target/release/ansible"
+  params:
+    nsize = "{nsize}",
+    scaled = "{scaled}"
+  shell: """
+    {input.bin} sketch -n {params.nsize} --scaled {params.scaled} -o {output} {input.sig}
+  """
+
+rule compile:
+  output: "ansible/target/release/ansible"
+  input:
+    "ansible/src/main.rs",
+    "ansible/Cargo.lock",
+    "ansible/Cargo.toml"
+  shell: """
+    cd ansible && cargo build --release
+  """
+
+rule compare:
+  output: "data/matrices/n{nsize}-s{scaled}"
+  input:  expand("data/sketches/chp{num}-n{{nsize}}-s{{scaled}}.sig", num=range(1, 14))
+  shell: """
+    sourmash compare {input} -o {output}
+  """
+
+rule plot:
+  output: "data/plots/n{nsize}-s{scaled}.matrix.png"
+  input: "data/matrices/n{nsize}-s{scaled}"
+  params:
+    outdir = lambda wildcards, output: Path(output[0]).parent
+  shell: """
+    sourmash plot {input} \
+      --output-dir {params.outdir} \
+      --labels
   """
