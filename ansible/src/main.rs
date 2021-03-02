@@ -7,6 +7,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use camino::Utf8PathBuf as PathBuf;
+use rayon::prelude::*;
 use rust_stemmers::{Algorithm, Stemmer};
 use sourmash::index::storage::ToWriter;
 use sourmash::signature::{Signature, SigsTrait};
@@ -17,6 +18,7 @@ use vtext::tokenize::{RegexpTokenizer, Tokenizer};
 
 #[derive(StructOpt, Debug)]
 enum Cli {
+    /// Build a new MinHash sketch for the dataset
     Sketch {
         /// Input dataset to be sketched
         #[structopt(parse(from_str))]
@@ -27,6 +29,24 @@ enum Cli {
         ngram: u8,
 
         /// scaled (what ratio of n-grams to keep for analysis)
+        #[structopt(short = "s", long = "scaled", default_value = "100")]
+        scaled: usize,
+
+        /// Output location
+        #[structopt(parse(from_str), short = "o", long = "output")]
+        output: Option<PathBuf>,
+    },
+    /// Create a new signature containing the hashes present in all signatures
+    Intersect {
+        /// List of signatures to intersect (one path per line)
+        #[structopt(parse(from_str))]
+        signatures: PathBuf,
+
+        /// select sketches with this n-gram size
+        #[structopt(short = "n", long = "ngram-size", default_value = "1")]
+        ngram: u8,
+
+        /// select sketches with this scaled parameter
         #[structopt(short = "s", long = "scaled", default_value = "100")]
         scaled: usize,
 
@@ -81,6 +101,55 @@ fn sketch_fancy<P: AsRef<Path>>(dataset: P, template: &Sketch) -> Result<Sketch>
     Ok(mh)
 }
 
+fn intersect<P: AsRef<Path>>(signatures: P, template: &Sketch) -> Result<Sketch> {
+    // Load sig paths into a vector
+    let paths: Vec<PathBuf> = BufReader::new(File::open(signatures)?)
+        .lines()
+        .map(|line| {
+            let mut path = PathBuf::new();
+            path.push(line.unwrap());
+            path
+        })
+        .collect();
+
+    let mh: Option<KmerMinHash> = paths
+        .par_iter()
+        // Map vector for loading the data
+        .map(|filename| {
+            // load sig
+            let search_sig = Signature::from_path(&filename)
+                .unwrap_or_else(|_| panic!("Error processing {:?}", filename))
+                .swap_remove(0);
+            // select sketch using template
+            let mut search_mh = None;
+            if let Some(Sketch::MinHash(mh)) = search_sig.select_sketch(&template) {
+                search_mh = Some(mh);
+            }
+            let search_mh = search_mh.unwrap();
+            Some(search_mh.clone())
+        })
+        // Reduce by keeping only intersection
+        .reduce(
+            || None,
+            |a: Option<KmerMinHash>, b: Option<KmerMinHash>| {
+                if a.is_none() {
+                    return b;
+                } else if b.is_none() {
+                    return a;
+                };
+
+                let mut a = a.unwrap();
+                let b = b.unwrap();
+                let common = a.intersection(&b).unwrap();
+                a.clear();
+                a.add_many(&common.0).unwrap();
+                Some(a)
+            },
+        );
+
+    Ok(Sketch::MinHash(mh.unwrap()))
+}
+
 fn build_template(scaled: usize, ngram: u8) -> Sketch {
     let max_hash = max_hash_for_scaled(scaled as u64);
     let template_mh = KmerMinHash::builder()
@@ -115,6 +184,32 @@ fn main() -> Result<()> {
             } else {
                 let mut path: PathBuf = dataset;
                 path.set_extension("sig");
+                path
+            };
+            let mut out = BufWriter::new(File::create(outpath)?);
+            sig.to_writer(&mut out)?;
+        }
+        Cli::Intersect {
+            signatures,
+            output,
+            ngram,
+            scaled,
+        } => {
+            let template = build_template(scaled, ngram);
+            let mh = intersect(&signatures, &template)?;
+
+            // save mh
+            let sig = Signature::builder()
+                .name(Some("Intersection".into()))
+                .hash_function("0.xxhash_ngram")
+                .filename(None)
+                .signatures(vec![mh])
+                .build();
+
+            let outpath: PathBuf = if let Some(p) = output {
+                p
+            } else {
+                let path: PathBuf = "intersection.sig".into();
                 path
             };
             let mut out = BufWriter::new(File::create(outpath)?);

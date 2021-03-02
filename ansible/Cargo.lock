@@ -37,6 +37,7 @@ dependencies = [
  "anyhow",
  "camino",
  "log",
+ "rayon",
  "rust-stemmers",
  "sourmash",
  "stop-words",
