@@ -29,6 +29,8 @@ jobs:
 
       - name: Generate figures
         run: ~/bin/nix-portable nix-shell --command "snakemake -j1"
+        env:
+          NP_DEBUG: 1
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3.7.3
