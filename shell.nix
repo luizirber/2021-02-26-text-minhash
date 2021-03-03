@@ -5,14 +5,14 @@ let
   mach-nix = import sources.mach-nix {
     pkgs = pkgs;
     python = "python39";
-    pypiDataRev = "3b6187edccd2d800ab3eeadc3abb726ed952c24d";
-    pypiDataSha256 = "020jnjj8vh8z9n5iy7swx1ai2pjz18xxq96i3m9lzvq3dq9f12hn";
+    # Updated: 2021-03-03
+    pypiDataRev = "721e7736180d89f7f49d8f25620ae9d58ae1a8b1";
+    pypiDataSha256 = "0r76z0ckqk56779z9f57p5330sgml1s4m4hyvr76iqlx8kjpqs9j";
   };
 
   customPython = mach-nix.mkPython {
     requirements = ''
-      sourmash
-      screed
+      sourmash>=4
     '';
   };
 in
