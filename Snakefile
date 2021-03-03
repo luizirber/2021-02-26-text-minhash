@@ -1,7 +1,7 @@
 from pathlib import Path
 
 rule all:
-  input: expand("data/plots/n{nsize}-s{scaled}.matrix.png", nsize=[1], scaled=[1])
+  input: expand("data/plots/n{nsize}-s{scaled}-a{abundance}.matrix.png", nsize=[1], scaled=[1], abundance=[0, 1])
 
 rule download:
   output: "data/book.epub"
@@ -32,7 +32,11 @@ rule sketch:
     nsize = "{nsize}",
     scaled = "{scaled}"
   shell: """
-    {input.bin} sketch -n {params.nsize} --scaled {params.scaled} -o {output} {input.sig}
+    {input.bin} sketch \
+      -n {params.nsize} \
+      --scaled {params.scaled} \
+      -o {output} \
+      {input.sig}
   """
 
 rule compile:
@@ -46,17 +50,19 @@ rule compile:
   """
 
 rule compare:
-  output: "data/matrices/n{nsize}-s{scaled}"
+  output: "data/matrices/n{nsize}-s{scaled}-a{abundance}"
   input:  expand("data/sketches/chp{num}-n{{nsize}}-s{{scaled}}.sig", num=range(1, 14))
+  params:
+      abundance = lambda w: "--ignore-abundance" if w.abundance == "0" else ""
   shell: """
-    sourmash compare {input} -o {output}
+    sourmash compare {params.abundance} {input} -o {output}
   """
 
 rule plot:
-  output: "data/plots/n{nsize}-s{scaled}.matrix.png"
-  input: "data/matrices/n{nsize}-s{scaled}"
+  output: "data/plots/n{nsize}-s{scaled}-a{abundance}.matrix.png"
+  input: "data/matrices/n{nsize}-s{scaled}-a{abundance}"
   params:
-    outdir = lambda wildcards, output: Path(output[0]).parent
+    outdir = lambda wildcards, output: Path(output[0]).parent,
   shell: """
     sourmash plot {input} \
       --output-dir {params.outdir} \
