@@ -5,7 +5,7 @@ use std::io::{BufRead, BufReader, BufWriter};
 use std::iter::FromIterator;
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use camino::Utf8PathBuf as PathBuf;
 use rayon::prelude::*;
 use rust_stemmers::{Algorithm, Stemmer};
@@ -54,6 +54,60 @@ enum Cli {
         #[structopt(parse(from_str), short = "o", long = "output")]
         output: Option<PathBuf>,
     },
+    Subtract {
+        /// Signature to remove hashes from
+        #[structopt(parse(from_str))]
+        signature: PathBuf,
+
+        /// Signature containing hashes to be subtracted
+        #[structopt(parse(from_str))]
+        to_remove: PathBuf,
+
+        /// select sketches with this n-gram size
+        #[structopt(short = "n", long = "ngram-size", default_value = "1")]
+        ngram: u8,
+
+        /// scaled
+        #[structopt(short = "s", long = "scaled", default_value = "10")]
+        scaled: usize,
+
+        /// The path for output
+        #[structopt(parse(from_str), short = "o", long = "output")]
+        output: Option<PathBuf>,
+    },
+}
+
+fn subtract<P: AsRef<Path> + std::fmt::Debug>(
+    mut query_sig: Signature,
+    to_remove: P,
+    template: &Sketch,
+) -> Result<Signature> {
+    // select sketch using template
+    let mut query_mh = None;
+    if let Some(Sketch::MinHash(mh)) = query_sig.select_sketch(&template) {
+        query_mh = Some(mh);
+    }
+    let mut query_mh = query_mh.unwrap().clone();
+
+    // Load hashes to remove
+    let to_remove_sig = Signature::from_path(&to_remove)
+        .map_err(|_| anyhow!("Error processing {:?}", to_remove))?
+        .swap_remove(0);
+    // select sketch using template
+    let mut to_remove_mh = None;
+    if let Some(Sketch::MinHash(mh)) = to_remove_sig.select_sketch(&template) {
+        to_remove_mh = Some(mh);
+    }
+    let to_remove_mh = to_remove_mh.unwrap();
+
+    let hashes_to_remove = to_remove_mh.mins();
+
+    query_mh.remove_many(&hashes_to_remove)?;
+
+    query_sig.reset_sketches();
+    query_sig.push(Sketch::MinHash(query_mh));
+
+    Ok(query_sig)
 }
 
 fn sketch_fancy<P: AsRef<Path>>(dataset: P, template: &Sketch) -> Result<Sketch> {
@@ -118,7 +172,8 @@ fn intersect<P: AsRef<Path>>(signatures: P, template: &Sketch) -> Result<Sketch>
         .map(|filename| {
             // load sig
             let search_sig = Signature::from_path(&filename)
-                .unwrap_or_else(|_| panic!("Error processing {:?}", filename))
+                .map_err(|_| anyhow!("Error processing {:?}", filename))
+                .ok()?
                 .swap_remove(0);
             // select sketch using template
             let mut search_mh = None;
@@ -156,6 +211,7 @@ fn build_template(scaled: usize, ngram: u8) -> Sketch {
         .num(0)
         .ksize(ngram as u32)
         .max_hash(max_hash)
+        .abunds(Some(vec![]))
         .build();
     Sketch::MinHash(template_mh)
 }
@@ -210,6 +266,30 @@ fn main() -> Result<()> {
                 p
             } else {
                 let path: PathBuf = "intersection.sig".into();
+                path
+            };
+            let mut out = BufWriter::new(File::create(outpath)?);
+            sig.to_writer(&mut out)?;
+        }
+        Cli::Subtract {
+            signature,
+            to_remove,
+            output,
+            ngram,
+            scaled,
+        } => {
+            let template = build_template(scaled, ngram);
+            let query = Signature::from_path(&signature)
+                .map_err(|_| anyhow!("Error processing {:?}", signature))?
+                .swap_remove(0);
+            let sig = subtract(query, &to_remove, &template)?;
+
+            // save sig
+            let outpath: PathBuf = if let Some(p) = output {
+                p
+            } else {
+                let mut path: PathBuf = signature;
+                path.set_extension("subtracted.sig");
                 path
             };
             let mut out = BufWriter::new(File::create(outpath)?);
