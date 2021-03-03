@@ -8,6 +8,7 @@ rule all:
              abundance=[0, 1],
              subset=["full", "sub"],
              exp=["dispossessed"]),
+    "data/sacred-n1-s1.txt"
 
 ## Rules for preparing The Dispossessed
 
@@ -47,45 +48,7 @@ rule sketch:
       {input.sig}
   """
 
-## Rules for preparing Bible and Torah
-
-rule download_torah:
-  output: "data/torah/book.epub"
-  shell: """
-    wget -c 'https://chaver.com/Torah-New/English/Text/The%20Structured%20Torah%20-%20Moshe%20Kline.epub' -O {output}
-  """
-
-rule extract_chapters_torah:
-  output: expand("data/OEBPS/Chapter{number}.xhtml", number=range(1, 14))
-  input: "data/torah/book.epub"
-  shell: """
-    cd data && unzip book.epub 'OEBPS/Chapter*.xhtml'
-  """
-
-rule convert_chapter_torah:
-  output: "data/txt/chp{num}.txt"
-  input: "data/OEBPS/Chapter{num}.xhtml"
-  shell: """
-    pandoc -t plain {input} -o {output}
-  """
-
-rule sketch_torah:
-  output: "data/sketches/full/chp{num}-n{nsize}-s{scaled}.sig"
-  input:
-    sig="data/txt/chp{num}.txt",
-    bin="ansible/target/release/ansible"
-  params:
-    nsize = "{nsize}",
-    scaled = "{scaled}"
-  shell: """
-    {input.bin} sketch \
-      -n {params.nsize} \
-      --scaled {params.scaled} \
-      -o {output} \
-      {input.sig}
-  """
-
-##
+## Compile ansible (the Rust program for sketching text)
 
 rule compile:
   output: "ansible/target/release/ansible"
@@ -97,9 +60,12 @@ rule compile:
     cd ansible && cargo build --release
   """
 
+## Compare, plot, intersect and subtract for dispossessed
+## (similarity, many chapters)
+
 rule compare:
   output: "data/matrices/dispossessed/{exp}/n{nsize}-s{scaled}-a{abundance}"
-  input:  expand("data/sketches/dispossessed/{{exp}}/chp{num}-n{{nsize}}-s{{scaled}}.sig", num=range(1, 14))
+  input: expand("data/sketches/dispossessed/{{exp}}/chp{num}-n{{nsize}}-s{{scaled}}.sig", num=range(1, 14))
   params:
       abundance = lambda w: "--ignore-abundance" if w.abundance == "0" else ""
   shell: """
@@ -156,4 +122,59 @@ rule subtract:
       --scaled {params.scaled} \
       -o {output.subtracted} \
       {input.sig} {input.intersection}
+  """
+
+## Rules for preparing Bible and Torah
+
+rule download_torah:
+  output: "data/books/torah/book.epub"
+  shell: """
+    wget -c 'https://chaver.com/Torah-New/English/Text/The%20Structured%20Torah%20-%20Moshe%20Kline.epub' -O {output}
+  """
+
+rule download_bible:
+  output: "data/txt/bible.txt"
+  shell: """
+    wget -c https://www.gutenberg.org/ebooks/10900.txt.utf-8 -O {output}
+  """
+
+rule extract_chapters_torah:
+  output: expand("data/books/torah/index_split_{number:03d}.html", number=range(9, 100))
+  input: "data/books/torah/book.epub"
+  shell: """
+    cd data/books/torah && unzip book.epub 'index_split_*'
+  """
+
+rule convert_torah:
+  output: "data/txt/torah.txt"
+  input: expand("data/books/torah/index_split_{num:03d}.html", num=range(9, 100))
+  shell: """
+    pandoc -t plain -o {output} {input}
+  """
+
+rule sketch_sacred:
+  output: "data/sketches/{book}/{book}-n{nsize}-s{scaled}.sig"
+  input:
+    sig="data/txt/{book}.txt",
+    bin="ansible/target/release/ansible"
+  params:
+    nsize = "{nsize}",
+    scaled = "{scaled}"
+  shell: """
+    {input.bin} sketch \
+      -n {params.nsize} \
+      --scaled {params.scaled} \
+      -o {output} \
+      {input.sig}
+  """
+
+## For Bible/Torah we don't need plots, only similarity/containment with sourmash sig overlap
+rule compare_sacred:
+  output: "data/sacred-n{nsize}-s{scaled}.txt"
+  input:
+    expand("data/sketches/{book}/{book}-n{{nsize}}-s{{scaled}}.sig", book=["torah", "bible"])
+  shell: """
+    sourmash sig overlap \
+      <(sourmash sig flatten -o - {input[0]}) \
+      <(sourmash sig flatten -o - {input[1]}) > {output}
   """
