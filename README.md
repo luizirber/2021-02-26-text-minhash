@@ -15,19 +15,50 @@ I wanted to check this because the book alternates between two different places
 (Anarres and Urras) and timeframes (past and present), so do they also cluster
 together (even and odd chapters numbers)?
 
-![](https://github.com/luizirber/2021-02-26-text-minhash/raw/gh-pages/n1-s1.matrix.png)
+First try, using only the presence of words:
+![](https://github.com/luizirber/2021-02-26-text-minhash/raw/gh-pages/dispossessed/full/n1-s1-a0.matrix.png)
 
-Seems like they do, and even chapter 13 (which is in another place) also
-separates from the other two clusters.
+Second try, considering the abundance (how many times each word appears):
+![](https://github.com/luizirber/2021-02-26-text-minhash/raw/gh-pages/dispossessed/full/n1-s1-a1.matrix.png)
+
+Third try: find the intersection (the words present in all chapters) and remove it.
+This removes the common background in all chapters, and maximizes the difference
+between them. This plot is also using the abundance.
+![](https://github.com/luizirber/2021-02-26-text-minhash/raw/gh-pages/dispossessed/sub/n1-s1-a1.matrix.png)
+
+It is interesting to notice that chapter 1 and 13 are "space travel" chapters,
+not totally in one or the other planet,
+and the odd/even chapters do group together.
+
+## Example 2: Similarity and Containment
+
+This example aims to show the difference between Similarity and Containment,
+and when you might prefer one to the other.
+For that, we use the Torah and the Bible as examples.
+
+The Torah is a composed of five books,
+which are also the first five books in the Bible.
+But, since they have different sizes (the Bible being much larger),
+the Similarity score is low (`0.34`) because similarity takes into account the
+union of elements from both datasets (the denominator in this equation):
+<img src="https://render.githubusercontent.com/render/math?math=J(A, B) = \frac{|A \cap B|}{|A \cup B|}">
+
+The Containment score takes into account the size of each dataset (in the denominator),
+and so it is an asymmetrical score.
+<img src="https://render.githubusercontent.com/render/math?math=C(A, B) = \frac{|A \cap B|}{|A|}">
+Because of this,
+Containment of the Torah in the Bible is high (`C(T, B) = 0.91`)
+while the Containment of the Bible in the Torah is small (`C(B, T) = 0.35`).
 
 ## Code organization
 
 There are two pieces in this repo:
 - [`ansible`](./ansible), a very minimal CLI written in Rust for transforming a text file
-  into a sourmash signature.
+  into a sourmash signature and performing intersection and subtraction of
+  signatures.
 - A [Snakemake pipeline](./Snakefile) for downloading data, building signature with
- `ansible`,  and running sourmash `compare` and `plot` commands to generate
- pretty pictures.
+  `ansible`,  and running sourmash `compare` and `plot` commands to generate
+  pretty pictures.
 
 ## Setup
 

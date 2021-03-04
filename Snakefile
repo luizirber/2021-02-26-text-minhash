@@ -94,6 +94,7 @@ rule intersect:
     nsize = "{nsize}",
     scaled = "{scaled}"
   run:
+      # sourmash equivalent: sourmash sig intersect -o {output.intersection} {input.sigs}
       with open(output.siglist, 'w') as f:
           for sig in input.sigs:
               f.write(sig + '\n')
@@ -123,6 +124,7 @@ rule subtract:
       -o {output.subtracted} \
       {input.sig} {input.intersection}
   """
+  # sourmash equivalent: sourmash sig subtract --flatten -o {output.subtracted} {input.sig} {input.intersection}
 
 ## Rules for preparing Bible and Torah
 
