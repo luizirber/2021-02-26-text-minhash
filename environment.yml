@@ -1,0 +1,13 @@
+name: 2021-02-26-text-minhash
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - snakemake-minimal=6.0.2
+  - sourmash=4.0.0
+  - jupyter-offlinenotebook=0.2.1
+  - jupyter-repo2docker=2021.1.0
+  - pandoc=2.11.4
+  - rust=1.50.0
+  - wget=1.20.1

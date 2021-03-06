@@ -1,5 +1,7 @@
 # Using sourmash with text
 
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/luizirber/2021-02-26-text-minhash/latest?urlpath=lab/)
+
 This is an experiment about using [sourmash] for working with natural
 language (instead of genomic _k_-mers). The goal is to use books for explaining
 how MinHash works, and make analogies to why we use _k_-mers for genomic data.
@@ -63,9 +65,31 @@ There are two pieces in this repo:
 ## Setup
 
 This projects depends on Snakemake, sourmash, pandoc, wget and a Rust compiler.
+
+### Nix
+
 If you don't want to download and install them yourself, you can use Nix
 to manage it for you:
+
 - Clone the repo.
 - [Install nix](https://nixos.org/guides/install-nix.html).
 - run `nix-shell` in the repo directory to open a shell with all deps installed.
 - run `snakemake -j1` to process the pipeline and generate figures
+
+### Conda
+
+You can also use the conda environment specified in `environment.yml`.
+To build and activate this environment run:
+
+```bash
+conda env create --force --file environment.yml
+
+conda activate 2021-02-26-text-minhash
+```
+
+After installing the conda environment,
+you can also use `repo2docker` to create a container with all dependencies,
+just like what is executed in `Binder`.
+```bash
+repo2docker .
+```
