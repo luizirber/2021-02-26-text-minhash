@@ -38,6 +38,8 @@ This example aims to show the difference between Similarity and Containment,
 and when you might prefer one to the other.
 For that, we use the Torah and the Bible as examples.
 
+![](https://github.com/luizirber/2021-02-26-text-minhash/raw/gh-pages/sacred-n1-s1.png)
+
 The Torah is a composed of five books,
 which are also the first five books in the Bible.
 But, since they have different sizes (the Bible being much larger),

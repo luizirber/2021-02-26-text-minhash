@@ -8,7 +8,8 @@ rule all:
              abundance=[0, 1],
              subset=["full", "sub"],
              exp=["dispossessed"]),
-    "data/sacred-n1-s1.txt"
+    "data/sacred-n1-s1.txt",
+    "data/plots/sacred-n1-s1.png"
 
 ## Rules for preparing The Dispossessed
 
@@ -180,3 +181,48 @@ rule compare_sacred:
       <(sourmash sig flatten -o - {input[0]}) \
       <(sourmash sig flatten -o - {input[1]}) > {output}
   """
+
+rule plot_venn:
+  output: "data/plots/sacred-n{nsize}-s{scaled}.png"
+  input: "data/sacred-n{nsize}-s{scaled}.txt"
+  run:
+    from matplotlib_venn import venn2
+    from ficus import FigureManager
+    import numpy as np
+
+    first = 0
+    second = 0
+    only_first = 0
+    only_second = 0
+    common = 0
+    total = 0
+    with open(input[0], 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith("number of hashes in first"):
+                first = int(line.split(":")[-1])
+            elif line.startswith("number of hashes in second"):
+                second = int(line.split(":")[-1])
+            elif line.startswith("only in first"):
+                only_first = int(line.split(":")[-1])
+            elif line.startswith("only in second"):
+                only_second = int(line.split(":")[-1])
+            elif line.startswith("number of hashes in common"):
+                common = int(line.split(":")[-1])
+            elif line.startswith("total"):
+                total = int(line.split(":")[-1])
+
+    with FigureManager(figsize=(4, 3), filename=output[0]) as (fig, ax):
+       v = venn2(
+         {
+            "01": only_first,
+            "10": only_second,
+            "11": common
+         },
+         set_labels = ["", ""],
+         ax=ax
+       )
+
+       ax.text(-.95, -0.05, "Bible", fontsize=16)
+       ax.text(.6, -0.05, "Torah", fontsize=16)
+       fig.tight_layout()

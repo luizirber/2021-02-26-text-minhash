@@ -4,15 +4,17 @@ let
   rustPlatform = import ./nix/rust.nix { inherit sources; };
   mach-nix = import sources.mach-nix {
     pkgs = pkgs;
-    python = "python39";
-    # Updated: 2021-03-03
-    pypiDataRev = "721e7736180d89f7f49d8f25620ae9d58ae1a8b1";
-    pypiDataSha256 = "0r76z0ckqk56779z9f57p5330sgml1s4m4hyvr76iqlx8kjpqs9j";
+    python = "python38";
+    # Updated: 2021-03-10
+    pypiDataRev = "a3b23cd3a838de119208cd8267474a6fffc3eeec";
+    pypiDataSha256 = "0v66j1ndz41pnkcr4in05yby7f0q3k9k0v6jrx0v42pq6bp0g74q";
   };
 
   customPython = mach-nix.mkPython {
     requirements = ''
       sourmash>=4
+      matplotlib-venn
+      ficus
     '';
   };
 in
